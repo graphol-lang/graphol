@@ -1,250 +1,186 @@
-# README
+# Graphol Rust Codebase Summary
 
-## O que o projeto se propõe a fazer
+## Scope of this analysis
 
-O projeto é um protótipo em JavaScript de uma linguagem chamada Graphol, executada no navegador.
+This summary was produced after reading:
 
-A proposta central da linguagem é modelar tudo como "nodos" que trocam mensagens:
+- The entire current repository tree (Rust source, tests, examples, manifest files, and ignore rules)
+- The last `README.md` (which describes a legacy JavaScript architecture)
+- Repository history around the migration (`HEAD` and 3-5 commits behind)
 
-- Uma expressão é uma sequência onde o primeiro nodo recebe os nodos seguintes.
-- O tipo efetivo do nodo surge a partir da primeira mensagem recebida.
-- Strings concatenam.
-- Números usam operações aritméticas.
-- Blocos funcionam como unidades executáveis.
-- Condicionais e execução assíncrona são tratados como combinações de nodos especiais.
+## Historical context: why the current README is outdated
 
-Na prática, o sistema pega um código-fonte Graphol escrito em um `textarea`, compila esse código para JavaScript e depois executa o resultado em uma máquina virtual simples baseada em escopos, blocos e threads cooperativas.
+- `6704b16` added `README.md` with a full explanation of the old JavaScript browser prototype (`PrototipoJS/...`).
+- `4970ec4` (current `HEAD`) performed a one-shot migration to Rust (`src/...`, `tests/...`, `examples/...`) and removed the JS runtime/compiler files.
+- 3-5 commits before `HEAD` (for example: `cd1309e`, `4cf67af`, `bf417fc`, `ec9fd95`) still belonged to the JS era, and the legacy `README` file was effectively empty.
 
-## Como o sistema funciona ponta a ponta
+Conclusion: `README.md` was generated for the previous codebase and was not updated hitherto.
 
-1. Uma página HTML de demonstração carrega `import.js`.
-2. `import.js` injeta todos os scripts do runtime e do compilador em ordem fixa.
-3. Ao final da carga, `import.js` instancia duas globais:
-   - `vm = new grapholVm()`
-   - `gc = new grapholCompiler()`
-4. O usuário escreve Graphol no `textarea`.
-5. Ao clicar em compilar, `gc.parser(...)` transforma o código Graphol em uma lista de instruções JavaScript.
-6. Ao clicar em executar, `vm.load(...)` carrega essas instruções e `vm.exec()` percorre os blocos, faz `eval(...)` linha a linha e movimenta o fluxo entre escopos, blocos e threads.
+## What the project is now
 
-## Arquitetura geral
+Graphol is now a Rust implementation of a small message-passing language runtime. It includes:
 
-### 1. Interface e demonstrações
+- A parser that builds an AST directly from Graphol source
+- An in-memory VM with scope chaining and cooperative multi-thread scheduling
+- Dynamic object strategies (node behavior determined by first received value)
+- Built-in commands/messages (`input`, `echo`, `stdout`, `if`, `run`, `async`, `else`)
+- Example `.graphol` programs and automated runtime tests
 
-As páginas HTML são demos manuais da linguagem. Cada uma ensina uma parte da sintaxe e oferece três botões:
+## End-to-end execution flow
 
-- Compilar e executar
-- Compilar
-- Executar
+1. Source is read from a file argument or `stdin` (`src/main.rs`).
+2. `parse_program` parses text into `Program`/`Expr`/`NodeExpr` AST structures (`src/parser.rs`, `src/ast.rs`).
+3. `Vm::new` is created with parsed program plus IO backend (`src/runtime/vm.rs`, `src/runtime/io.rs`).
+4. VM initializes a root scope with built-ins (`src/runtime/scope.rs`).
+5. Each expression is evaluated as:
+   - First node = receiver object
+   - Remaining nodes = messages sent to receiver
+6. Objects mutate behavior via strategy objects (`src/runtime/object/...`).
+7. `echo` emits outputs through `RuntimeIo`; `input` reads from IO backend.
+8. Blocks can execute synchronously (`run`) or spawn async threads (`async run`).
 
-Elas compartilham o mesmo runtime e variam apenas no texto explicativo e no exemplo de código.
+## Current repository structure
 
-### 2. Loader
+- `src/`: language front-end + runtime implementation
+- `tests/`: runtime-level integration tests
+- `examples/`: sample Graphol programs
+- `Cargo.toml` / `Cargo.lock`: crate metadata and lockfile
+- `.gitignore`: NetBeans leftovers + `target/`
+- `README.md`: Graphol Rust Codebase Summary
 
-`PrototipoJS/import.js` controla a ordem de carga dos arquivos. Essa ordem é importante porque o projeto depende de funções globais e não usa empacotador, módulos ES nem CommonJS.
+## File-by-file analysis (current tree)
 
-### 3. Compilador
+### Root files
 
-`PrototipoJS/compiler/compiler.js` implementa o parser/compilador. Ele faz análise manual de caracteres, reconhece nodos reservados, strings, números, nomes, parênteses e blocos entre chaves.
+- `Cargo.toml`: crate `graphol-rs`, edition 2024, no external dependencies.
+- `Cargo.lock`: lockfile with only the local package.
+- `.gitignore`: ignores `nbproject` folders and `target`.
+- `README.md`: legacy JS documentation; does not represent current Rust architecture.
 
-O compilador não produz AST formal. Em vez disso, gera diretamente linhas de JavaScript em texto.
+### Entry points and API
 
-### 4. Runtime
+- `src/main.rs`:
+  - CLI entry point.
+  - Reads source from `argv[1]` or `stdin`.
+  - Parses and runs VM with `StdIo`.
+- `src/lib.rs`:
+  - Public modules: `ast`, `parser`, `runtime`.
+  - Exposes `run_graphol(source, io)` convenience API.
+  - Wraps parse/VM errors into `GrapholError`.
 
-O runtime principal está em:
+### AST and parser
 
-- `PrototipoJS/vm/graphol.js`
-- `PrototipoJS/vm/grapholvm.js`
-- `PrototipoJS/vm/graphol/lang/...`
-- `PrototipoJS/vm/graphol/command/...`
+- `src/ast.rs`:
+  - Defines `Program`, `Expr`, `NodeExpr`, `BlockLiteral`.
+  - Defines reserved operator enums:
+    - `ArithmeticOp` (`+ - * / ^`)
+    - `LogicOp` (`= != > < >= <=`)
+    - `BooleanOp` (`& | ! x|`)
+- `src/parser.rs`:
+  - Hand-written character parser (no parser generator).
+  - Produces AST directly.
+  - Supports:
+    - Identifiers
+    - String literals with escape handling
+    - Parenthesized sub-expressions
+    - Block literals `{ ... }`
+    - Reserved operators/tokens
+  - Emits `ParseError { message, position }`.
 
-Ele fornece:
+### Runtime module surface
 
-- Escopo com busca hierárquica de nodos
-- Nodo genérico com estratégia dinâmica
-- Tipos primitivos e compostos
-- Mensagens especiais como `run`, `async` e `else`
-- Comandos como `echo`, `input` e `if`
-- Saída configurável entre `alert` e `console`
+- `src/runtime/mod.rs`: exports runtime submodules and re-exports VM/IO public types.
+- `src/runtime/host.rs`: `ExecutionHost` trait used by objects to request side effects.
+- `src/runtime/value.rs`:
+  - Runtime `Value` union (`Obj`, `Number`, `Text`, `Bool`, `Null`).
+  - Conversion helpers (`as_text`, `as_number`, `as_bool`, `to_scalar`).
+- `src/runtime/io.rs`:
+  - `RuntimeIo` trait abstraction.
+  - `StdIo` for interactive CLI.
+  - `TestIo` for deterministic tests.
+  - `OutputMode` (`Alert`, `Console`) and `OutputEvent`.
+- `src/runtime/scope.rs`:
+  - Hierarchical scope with parent lookup.
+  - Initializes built-ins in every new scope.
+  - Supports `find`, `get` (auto-create node), and `set`.
 
-## Fluxo interno entre os módulos
+### Object system and strategies
 
-### Fluxo de compilação
+- `src/runtime/object.rs`:
+  - Core `GrapholObject` trait.
+  - `MessageKind` enum (`Run`, `Async`, `Else`).
+  - `BlockSnapshot` transport object for block invocation.
+  - `StdoutState` shared mutable output-mode state.
+  - Utility wrappers for send/exec/end/message-kind extraction.
+- `src/runtime/object/object_commands.rs`:
+  - Block object (`run`, `async`, `inbox` behavior).
+  - Commands: `input`, `echo`, `stdout`, `if`.
+  - Message objects: `run`, `async`, `else`.
+  - `if` command state machine supports chained conditions and optional `else`.
+- `src/runtime/object/object_strategies.rs`:
+  - Strategy module aggregator/re-export.
+- `src/runtime/object/object_strategies/strategy_core.rs`:
+  - Splits primitive vs numeric strategy modules.
+- `src/runtime/object/object_strategies/node_primitives.rs`:
+  - Generic node with late-bound strategy (`NodeObject`).
+  - String and boolean strategies.
+  - Strategy factory that maps first received value/type to concrete strategy.
+- `src/runtime/object/object_strategies/numeric_ops.rs`:
+  - Number strategy with operator handoff.
+  - Arithmetic operator strategy implementing accumulation.
+  - Supports XOR via integer cast.
+- `src/runtime/object/object_strategies/strategy_predicates.rs`:
+  - Logic comparator strategy (type-aware comparisons).
+  - Boolean operator strategy (`and`, `or`, `not`, `xor`).
 
-- `grapholCompiler.parser(...)` consome o texto fonte inteiro.
-- `processaExpressao(...)` interpreta uma expressão Graphol como "receptor + mensagens".
-- `processaNodo(...)` reconhece:
-  - operadores aritméticos
-  - operadores lógicos
-  - operadores booleanos
-  - strings
-  - números
-  - nomes de nodos
-- Quando encontra `{ ... }`, o compilador gera um `strategy_Block`, associa a VM e guarda o escopo pai.
-- O resultado final é um texto com instruções JavaScript separadas por quebra de linha.
+### Virtual machine
 
-### Fluxo de execução
+- `src/runtime/vm.rs`:
+  - Main scheduler/executor.
+  - Maintains multiple threads, each with frame stacks.
+  - Evaluates expressions using receiver/message semantics.
+  - Converts AST nodes into runtime values/objects.
+  - Creates child scopes for blocks and injects `inbox`.
+  - Executes sync blocks inline on current thread.
+  - Enqueues async blocks as separate threads.
+  - Captures emitted output events and forwards to IO backend.
 
-- `grapholVm.load(...)` divide o código compilado em blocos.
-- `grapholVm.exec()` cria a thread inicial e passa a executar o array `p_blocks`.
-- Cada thread mantém:
-  - `IR.BASE`
-  - `IR.ADDR`
-  - `IR.SCOPE`
-  - pilha de retorno
-- Cada linha compilada é executada com `eval(...)`.
-- Quando um bloco é chamado, a VM empilha o contexto atual e entra em um novo escopo `CGraphol`.
-- Quando um bloco termina, `self.callback()` restaura o frame anterior ou remove a thread.
-- Se o bloco tiver recebido a mensagem `async`, a VM cria uma nova thread para ele.
+### Tests and examples
 
-### Fluxo de escopo e resolução de nomes
+- `tests/graphol_runtime.rs`:
+  - Integration tests for arithmetic, blocks/inbox, conditionals/else, async execution.
+  - Uses `run_graphol` + `TestIo`.
+- `examples/program.graphol`: basic variables, input, nested echo, and expression usage.
+- `examples/program2.graphol`: arithmetic demos.
+- `examples/program3.graphol`: block + `inbox` + `input`.
+- `examples/program4.graphol`: conditionals and boolean logic.
+- `examples/program5.graphol`: async block execution and output mode switch.
+- `examples/program6.graphol`: conditional/boolean scenario duplicated from program4-style content.
 
-- `CGraphol` guarda os nodos do escopo atual.
-- `find(...)` tenta resolver primeiro no escopo local e depois sobe para o pai.
-- `get(...)` retorna o nodo existente ou cria um novo `Nodo`.
-- Blocos recebem um `inbox` para entrada de dados, disponível como nome reservado no escopo do bloco.
+## How files communicate with each other
 
-### Fluxo de tipagem dinâmica
+- `main.rs` depends on `parser` + `runtime::Vm`.
+- `lib.rs` orchestrates `parse_program` -> `Vm::run`.
+- `parser.rs` produces AST types from `ast.rs`.
+- `vm.rs` is the central consumer of AST and producer of runtime behavior.
+- `vm.rs` relies on:
+  - `scope.rs` for symbol lookup and built-ins
+  - `object.rs` and strategy/command submodules for dynamic behavior
+  - `value.rs` for value transport/conversions
+  - `io.rs` for side effects
+- `object_commands.rs` and strategy modules call back into VM behavior only through `ExecutionHost` (`host.rs`), keeping object logic decoupled from VM internals.
+- Tests validate language behavior through the public API (`run_graphol`) rather than internal modules.
 
-- `Nodo` começa sem estratégia.
-- A primeira mensagem define sua estratégia via `strategy_Factory(...)`.
-- Depois disso, todas as mensagens são encaminhadas para a estratégia escolhida.
-- Isso explica o comportamento descrito nas demos: um mesmo nome pode se comportar como texto, número, bloco ou operador dependendo do primeiro valor recebido.
+## Functional coverage of the Rust implementation
 
-## Análise arquivo por arquivo
+- Dynamic node typing based on first message
+- Numeric, string, boolean, logic, and arithmetic operator semantics
+- Blocks with lexical parent scope + `inbox`
+- `if`/`else` control flow
+- Sync and async block execution model
+- Pluggable IO with event capture
 
-### Arquivos raiz
+## Overall assessment
 
-| Arquivo | Papel |
-|---|---|
-| `README` | Existe, mas está vazio. Não documenta o projeto. |
-| `.gitignore` | Ignora apenas metadados de NetBeans em `nbproject/`. |
-
-### Páginas de demonstração
-
-| Arquivo | Papel |
-|---|---|
-| `PrototipoJS/graphol.html` | Demo de regras básicas: atribuição por mensagens, strings, números e expressões aninhadas. |
-| `PrototipoJS/graphol2.html` | Demo de operações numéricas e uso de operadores como nodos. |
-| `PrototipoJS/graphol3.html` | Demo de blocos e uso de `run` com `inbox`. |
-| `PrototipoJS/graphol4.html` | Demo de condicionais com comparações, negação e operadores booleanos. |
-| `PrototipoJS/graphol5.html` | Demo de execução assíncrona e troca de estratégia de saída para `console`. |
-| `PrototipoJS/graphol6.html` | Página adicional muito parecida com `graphol4.html`; parece uma variação/duplicata de teste da demo de condicionais. |
-| `PrototipoJS/import.js` | Carrega todos os scripts do projeto em ordem e instancia a VM e o compilador ao final. |
-
-### Núcleo de escopo e VM
-
-| Arquivo | Papel |
-|---|---|
-| `PrototipoJS/vm/graphol.js` | Define `CGraphol`, o ambiente de execução com tabela de nodos e lookup encadeado por escopo pai. Também registra comandos e mensagens embutidos. |
-| `PrototipoJS/vm/grapholvm.js` | Define `grapholVm`, a máquina virtual que carrega código compilado, gerencia threads, pilha de retorno, saltos e execução linha a linha via `eval(...)`. |
-
-### Base da linguagem
-
-| Arquivo | Papel |
-|---|---|
-| `PrototipoJS/vm/graphol/lang/base.js` | Define `strategy_Null` e `strategy_Factory`, que escolhe a estratégia correta para cada valor recebido por um nodo. |
-| `PrototipoJS/vm/graphol/lang/nodo.js` | Define `Nodo`, o invólucro genérico que delega comportamento para uma estratégia concreta. |
-
-### Tipos e estratégias
-
-| Arquivo | Papel |
-|---|---|
-| `PrototipoJS/vm/graphol/lang/types/number.js` | Implementa `strategy_Number`, com acumulação numérica e troca dinâmica de operador. |
-| `PrototipoJS/vm/graphol/lang/types/string.js` | Implementa `strategy_String`, concatenando tudo que recebe. |
-| `PrototipoJS/vm/graphol/lang/types/boolean.js` | Implementa `strategy_Boolean`, encapsulando um valor booleano. |
-| `PrototipoJS/vm/graphol/lang/types/operator.js` | Implementa `strategy_Operator`, que acumula operações aritméticas sobre um valor interno. |
-| `PrototipoJS/vm/graphol/lang/types/block.js` | Implementa `strategy_Block`, que representa blocos executáveis, recebe `run`/`async`, carrega `inbox` e chama a VM. |
-
-### Operadores lógicos e booleanos
-
-| Arquivo | Papel |
-|---|---|
-| `PrototipoJS/vm/graphol/lang/booleanOperators/logicOperator.js` | Implementa comparações como `==`, `!=`, `>`, `<`, `>=`, `<=` com validação de tipo entre operandos. |
-| `PrototipoJS/vm/graphol/lang/booleanOperators/booleanOperator.js` | Implementa operadores booleanos `&&`, `||`, `!` e `x|` (xor). |
-
-### Mensagens especiais
-
-| Arquivo | Papel |
-|---|---|
-| `PrototipoJS/vm/graphol/lang/messages/run.js` | Define a mensagem `run`, usada para executar blocos. |
-| `PrototipoJS/vm/graphol/lang/messages/async.js` | Define a mensagem `async`, usada para marcar blocos para nova thread. |
-| `PrototipoJS/vm/graphol/lang/messages/else.js` | Define a mensagem `else`, usada pelo comando `if`. |
-
-### Comandos
-
-| Arquivo | Papel |
-|---|---|
-| `PrototipoJS/vm/graphol/lang/commands/if.js` | Implementa o comando `if`, consumindo pares condição/bloco e opcionalmente um `else`. |
-| `PrototipoJS/vm/graphol/command/echo.js` | Implementa `echo`, enviando texto para a estratégia de saída atual. |
-| `PrototipoJS/vm/graphol/command/input.js` | Implementa `input` com `prompt(...)`, retornando valor textual/numérico. |
-| `PrototipoJS/vm/graphol/command/stdout/core.js` | Implementa `Stdout`, que seleciona entre `Alert` e `Console`. |
-| `PrototipoJS/vm/graphol/command/stdout/alert.js` | Estratégia de saída baseada em `alert(...)`. |
-| `PrototipoJS/vm/graphol/command/stdout/console.js` | Estratégia de saída baseada em `console.log(...)`. |
-
-### Compilador
-
-| Arquivo | Papel |
-|---|---|
-| `PrototipoJS/compiler/compiler.js` | Traduz o código Graphol para JavaScript executável pela VM. É o coração da sintaxe da linguagem. |
-
-## Como os arquivos se comunicam
-
-| Origem | Destino | Relação |
-|---|---|---|
-| `graphol*.html` | `import.js` | Todas as demos dependem do loader para trazer o runtime e o compilador. |
-| `import.js` | todos os scripts do runtime | Define a ordem de carga e garante que símbolos globais existam antes do uso. |
-| `import.js` | `grapholVm` e `grapholCompiler` | Instancia as globais `vm` e `gc`. |
-| `grapholCompiler` | `strategy_Block` e `grapholVm` | Ao compilar blocos, gera código que cria blocos executáveis ligados a `self` (a VM atual). |
-| `grapholVm` | `CGraphol` | Cada frame/thread recebe um escopo Graphol próprio. |
-| `CGraphol` | comandos, mensagens e nodos dinâmicos | Expõe `input`, `echo`, `if`, `run`, `async`, `else`, `stdout` e nomes definidos pelo usuário. |
-| `Nodo` | `strategy_Factory` | Delegação de tipagem dinâmica. |
-| `strategy_Factory` | tipos concretos | Seleciona `strategy_String`, `strategy_Number`, `strategy_Boolean`, `strategy_Block` etc. |
-| `If` | `Else` e blocos | Interpreta `else` como mensagem de controle para executar o bloco alternativo. |
-| `strategy_Block` | `grapholVm.call(...)` | Inicia execução do bloco em thread atual ou nova thread. |
-| `Echo` | `Stdout` | Envia a representação textual do valor para a saída atual. |
-| `Stdout` | `Alert` ou `Console` | Troca a estratégia de exibição de resultado. |
-
-## O que o projeto faz de fato hoje
-
-Pelo estado atual do código, o projeto entrega:
-
-- Um protótipo navegável da linguagem Graphol
-- Um compilador direto de Graphol para JavaScript
-- Um runtime com escopos e blocos
-- Suporte a:
-  - texto
-  - número
-  - operadores aritméticos
-  - comparações
-  - operadores booleanos
-  - blocos
-  - condicionais
-  - entrada por `prompt`
-  - saída por `alert` ou `console`
-  - execução assíncrona simulada por múltiplas threads na VM
-
-Ele não entrega:
-
-- empacotamento moderno
-- testes automatizados
-- documentação formal
-- separação entre parser, AST e codegen
-- segurança de execução, porque depende de `eval(...)`
-
-## Observações técnicas relevantes
-
-- O projeto tem perfil claro de protótipo/experimento, não de produto pronto.
-- O runtime depende fortemente de variáveis globais e ordem de carga manual.
-- A VM executa o código compilado com `eval(...)`, o que simplifica o protótipo mas aumenta acoplamento e risco.
-- Há métodos incompletos ou pouco usados, como `Nodo.equals(...)`, partes de `strategy_Null()` e `tonumber/tostring` vazios em `strategy_Block`.
-- Há sinais de nomenclatura inconsistente para booleanos (`toBoolean` vs `toboolean`) em partes da base, sugerindo código experimental.
-- `graphol6.html` aparenta ser redundante em relação a `graphol4.html`.
-- O texto explicativo de algumas demos não acompanha exatamente a funcionalidade demonstrada, indicando documentação interna ainda imatura.
-
-## Conclusão
-
-Graphol é um protótipo de linguagem orientada a nodos e mensagens, implementado integralmente em JavaScript para navegador. O repositório concentra três camadas:
-
-- demos HTML para experimentação manual
-- um compilador textual que gera JavaScript
-- uma VM simples que executa esse JavaScript com escopos, blocos e threads
+The project is a focused Rust runtime rewrite of Graphol’s original prototype semantics.
+Core language behavior (message passing, node strategies, blocks, conditionals, async-like scheduling, IO commands) is implemented and tested.
