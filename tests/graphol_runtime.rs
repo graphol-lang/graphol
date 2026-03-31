@@ -1,10 +1,32 @@
 use graphol_rs::run_graphol;
-use graphol_rs::runtime::TestIo;
+use graphol_rs::runtime::{OutputMode, RuntimeIo, TestIo};
+use std::cell::RefCell;
+use std::collections::VecDeque;
+use std::rc::Rc;
 
 fn values(source: &str, inputs: Vec<&str>) -> Vec<String> {
     let io = TestIo::new(inputs.into_iter().map(ToString::to_string).collect());
     let events = run_graphol(source, Box::new(io)).expect("program should run");
     events.into_iter().map(|event| event.value).collect()
+}
+
+#[derive(Default)]
+struct InputCapture {
+    prompts: Vec<String>,
+}
+
+struct CapturingIo {
+    inputs: VecDeque<String>,
+    capture: Rc<RefCell<InputCapture>>,
+}
+
+impl RuntimeIo for CapturingIo {
+    fn read_input(&mut self, prompt: &str) -> String {
+        self.capture.borrow_mut().prompts.push(prompt.to_string());
+        self.inputs.pop_front().unwrap_or_default()
+    }
+
+    fn on_output(&mut self, _mode: OutputMode, _value: &str) {}
 }
 
 #[test]
@@ -121,4 +143,36 @@ baz run
     assert!(out.contains(&"FOOOOOOOOO".to_string()));
     assert!(out.contains(&"BARRRRRRRR".to_string()));
     assert!(out.contains(&"BAZZZZZZZZ".to_string()));
+}
+
+#[test]
+fn composes_input_prompt_and_reads_once_per_expression() {
+    let source = r#"
+dobra {
+   x inbox
+   echo "o dobro e:" (x * 2)
+}
+
+nome (input "Qual o seu nome?")
+numero 0 (input "Ola " nome ", diga um numero.")
+dobra numero run
+"#;
+
+    let capture = Rc::new(RefCell::new(InputCapture::default()));
+    let io = CapturingIo {
+        inputs: vec!["Chavao".to_string(), "12".to_string()].into(),
+        capture: capture.clone(),
+    };
+
+    let events = run_graphol(source, Box::new(io)).expect("program should run");
+    let out: Vec<String> = events.into_iter().map(|event| event.value).collect();
+
+    assert_eq!(out, vec!["o dobro e:", "24"]);
+    assert_eq!(
+        capture.borrow().prompts.clone(),
+        vec![
+            "Qual o seu nome?".to_string(),
+            "Ola Chavao, diga um numero.".to_string()
+        ]
+    );
 }
