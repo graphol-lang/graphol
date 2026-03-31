@@ -1,12 +1,11 @@
 use std::env;
-use std::fs;
 use std::io::{self, Read};
 
 mod cli;
 
 use cli::{compile_file, parse_cli_args};
-use graphol_rs::parser::parse_program;
-use graphol_rs::runtime::{StdIo, Vm};
+use graphol_rs::runtime::StdIo;
+use graphol_rs::{run_graphol, run_graphol_file};
 
 fn main() {
     if let Err(err) = run() {
@@ -25,8 +24,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             run_source(&buffer)?;
         }
         (Some(input), None) => {
-            let source = fs::read_to_string(input)?;
-            run_source(&source)?;
+            run_file(&input)?;
         }
         (Some(input), Some(output)) => {
             compile_file(&input, &output)?;
@@ -39,8 +37,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn run_source(source: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let program = parse_program(source)?;
-    let mut vm = Vm::new(program, Box::new(StdIo));
-    vm.run()?;
+    run_graphol(source, Box::new(StdIo))?;
+    Ok(())
+}
+
+fn run_file(path: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
+    run_graphol_file(path, Box::new(StdIo))?;
     Ok(())
 }

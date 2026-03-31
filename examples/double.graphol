@@ -1,0 +1,4 @@
+double {
+   x inbox
+   echo "the double is:" (x * 2)
+}

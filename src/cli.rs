@@ -7,6 +7,7 @@ use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use graphol_rs::parser::parse_program;
+use graphol_rs::source_loader::load_entry_source;
 
 #[derive(Debug, Default)]
 pub struct CliOptions {
@@ -61,7 +62,7 @@ pub fn parse_cli_args(args: impl IntoIterator<Item = OsString>) -> io::Result<Cl
 }
 
 pub fn compile_file(input: &Path, output: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    let source = fs::read_to_string(input)?;
+    let source = load_entry_source(input)?;
     parse_program(&source)?;
 
     let (rlib_path, deps_path) = find_runtime_artifacts()?;

@@ -1,8 +1,11 @@
-use graphol_rs::run_graphol;
 use graphol_rs::runtime::{OutputMode, RuntimeIo, TestIo};
+use graphol_rs::{run_graphol, run_graphol_file};
 use std::cell::RefCell;
 use std::collections::VecDeque;
+use std::fs;
+use std::path::PathBuf;
 use std::rc::Rc;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 fn values(source: &str, inputs: Vec<&str>) -> Vec<String> {
     let io = TestIo::new(inputs.into_iter().map(ToString::to_string).collect());
@@ -175,4 +178,36 @@ double number run
             "Hello Chavao, tell me a number.".to_string()
         ]
     );
+}
+
+#[test]
+fn executes_program_with_include_from_file() {
+    let root = create_temp_dir("runtime_include");
+    fs::write(
+        root.join("main.graphol"),
+        "include \"program3.graphol\"\n\ndouble 44 run\n",
+    )
+    .expect("main should be written");
+    fs::write(
+        root.join("program3.graphol"),
+        "double {\n   x inbox\n   echo \"the double is:\" (x * 2)\n}\n\nname (input \"What is your name?\")\nnumber 0 (input \"Hello \" name \", tell me a number.\")\ndouble number run\n",
+    )
+    .expect("program3 should be written");
+
+    let io = TestIo::new(vec!["Ada".to_string(), "44".to_string()]);
+    let events = run_graphol_file(&root.join("main.graphol"), Box::new(io))
+        .expect("program with include should run");
+    let out: Vec<String> = events.into_iter().map(|event| event.value).collect();
+
+    assert_eq!(out, vec!["the double is:", "88", "the double is:", "88"]);
+}
+
+fn create_temp_dir(name: &str) -> PathBuf {
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("time should be monotonic")
+        .as_nanos();
+    let path = std::env::temp_dir().join(format!("graphol_runtime_test_{}_{}", name, timestamp));
+    fs::create_dir_all(&path).expect("temp dir should be created");
+    path
 }
