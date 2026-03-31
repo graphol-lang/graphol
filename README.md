@@ -11,13 +11,13 @@ Use this section as a quick reference for day-to-day usage.
 This builds `graphol` (the CLI that can interpret `.graphol` files and also generate executables):
 
 ```bash
-cargo build
+make build
 ```
 
-Binary path after build:
+Install the binary after build:
 
 ```bash
-./target/debug/graphol
+sudo make install
 ```
 
 ### 2. Run a `.graphol` program in interpreter mode (no `-o`)
@@ -25,13 +25,13 @@ Binary path after build:
 In this mode, `graphol` reads and executes the source file directly:
 
 ```bash
-./target/debug/graphol examples/program5.graphol
+graphol examples/program5.graphol
 ```
 
 You can also pipe source through stdin:
 
 ```bash
-cat examples/program5.graphol | ./target/debug/graphol
+cat examples/program5.graphol | graphol
 ```
 
 ### 3. Compile a `.graphol` program to a Linux executable (`-o` / `--output`)
@@ -39,13 +39,13 @@ cat examples/program5.graphol | ./target/debug/graphol
 In this mode, `graphol` generates a standalone Linux executable for the provided Graphol source:
 
 ```bash
-./target/debug/graphol examples/program5.graphol -o program5
+graphol examples/program5.graphol -o program5
 ```
 
 Equivalent long flag:
 
 ```bash
-./target/debug/graphol examples/program5.graphol --output program5
+graphol examples/program5.graphol --output program5
 ```
 
 Run the generated executable:
@@ -61,13 +61,13 @@ If the input path is a directory, `graphol` automatically uses `<directory>/main
 Run in interpreter mode:
 
 ```bash
-./target/debug/graphol examples
+graphol examples
 ```
 
 Compile from directory entry:
 
 ```bash
-./target/debug/graphol examples -o program_from_examples
+graphol examples -o program_from_examples
 ```
 
 ### Difference between using `-o/--output` or not
