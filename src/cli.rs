@@ -12,27 +12,33 @@ use graphol::source_loader::load_entry_source;
 
 #[derive(Debug, Default)]
 pub struct CliOptions {
-    pub input: Option<PathBuf>,
-    pub output: Option<PathBuf>,
+    pub input: PathBuf,
+    pub output: PathBuf,
 }
 
 pub fn parse_cli_args(args: impl IntoIterator<Item = OsString>) -> io::Result<CliOptions> {
-    let mut options = CliOptions::default();
+    let mut input: Option<PathBuf> = None;
+    let mut output: Option<PathBuf> = None;
     let mut args = args.into_iter();
     while let Some(arg) = args.next() {
         if arg == "-o" || arg == "--output" {
-            let output = args.next().ok_or_else(|| {
+            let value = args.next().ok_or_else(|| {
                 io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "missing value after -o/--output",
                 )
             })?;
-            options.output = Some(PathBuf::from(output));
+            output = Some(PathBuf::from(value));
             continue;
         }
 
         if let Some(value) = arg.to_string_lossy().strip_prefix("-o=") {
-            options.output = Some(PathBuf::from(value));
+            output = Some(PathBuf::from(value));
+            continue;
+        }
+
+        if let Some(value) = arg.to_string_lossy().strip_prefix("--output=") {
+            output = Some(PathBuf::from(value));
             continue;
         }
 
@@ -43,23 +49,26 @@ pub fn parse_cli_args(args: impl IntoIterator<Item = OsString>) -> io::Result<Cl
             ));
         }
 
-        if options.input.is_some() {
+        if input.is_some() {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "multiple input files provided",
             ));
         }
-        options.input = Some(PathBuf::from(arg));
+        input = Some(PathBuf::from(arg));
     }
 
-    if options.output.is_some() && options.input.is_none() {
-        return Err(io::Error::new(
+    let input = input.ok_or_else(|| {
+        io::Error::new(io::ErrorKind::InvalidInput, "missing input .graphol file")
+    })?;
+    let output = output.ok_or_else(|| {
+        io::Error::new(
             io::ErrorKind::InvalidInput,
-            "output option requires an input .graphol file",
-        ));
-    }
+            "missing required option: -o/--output <executable>",
+        )
+    })?;
 
-    Ok(options)
+    Ok(CliOptions { input, output })
 }
 
 pub fn compile_file(input: &Path, output: &Path) -> Result<(), Box<dyn std::error::Error>> {
@@ -163,17 +172,21 @@ mod tests {
         ])
         .expect("args should be valid");
 
-        assert_eq!(
-            options.input,
-            Some(PathBuf::from("examples/program5.graphol"))
-        );
-        assert_eq!(options.output, Some(PathBuf::from("program5")));
+        assert_eq!(options.input, PathBuf::from("examples/program5.graphol"));
+        assert_eq!(options.output, PathBuf::from("program5"));
     }
 
     #[test]
-    fn output_requires_input() {
+    fn output_option_requires_input() {
         let error = parse_cli_args([OsString::from("-o"), OsString::from("program5")])
             .expect_err("missing input should fail");
+        assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
+    }
+
+    #[test]
+    fn input_requires_output_option() {
+        let error = parse_cli_args([OsString::from("examples/program5.graphol")])
+            .expect_err("missing output should fail");
         assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
     }
 

@@ -20,21 +20,7 @@ Install the binary after build:
 sudo make install
 ```
 
-### 2. Run a `.graphol` program in interpreter mode (no `-o`)
-
-In this mode, `graphol` reads and executes the source file directly:
-
-```bash
-graphol examples/program5.graphol
-```
-
-You can also pipe source through stdin:
-
-```bash
-cat examples/program5.graphol | graphol
-```
-
-### 3. Compile a `.graphol` program to a Linux executable (`-o` / `--output`)
+### 2. Compile a `.graphol` program to a Linux executable (`-o` / `--output`)
 
 In this mode, `graphol` generates a standalone Linux executable for the provided Graphol source:
 
@@ -54,7 +40,7 @@ Run the generated executable:
 ./program5
 ```
 
-### 4. Use a directory as input (defaults to `main.graphol`)
+### 3. Use a directory as input (defaults to `main.graphol`)
 
 If the input path is a directory, `graphol` automatically uses `<directory>/main.graphol` as the entry file.
 
