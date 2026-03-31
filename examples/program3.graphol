@@ -1,8 +1,8 @@
-dobra {
+double {
    x inbox
-   echo "o dobro é:" (x * 2)
+   echo "the double is:" (x * 2)
 }
 
-nome (input "Qual o seu nome?")
-numero 0 (input "Olá " nome ", diga um número.")
-dobra numero run
+name (input "What is your name?")
+number 0 (input "Hello " name ", tell me a number.")
+double number run

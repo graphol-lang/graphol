@@ -1,23 +1,23 @@
 if (= 3 6){
-      echo "Isto é falso"
+      echo "This is false"
  } (> 4 5) {
-      echo "Isto não é verdade"
+      echo "This is not true"
  } else {
-      echo "Na verdade, sem verdades por aqui..."
+      echo "Actually, no truths around here..."
 }
 
 if (!(= 3 6)){
-      echo "Em programação, a negação de uma mentira é uma verdade!"
+      echo "In programming, the negation of a lie is truth!"
  } (< 4 5) {
-      echo "E isto também é verdade"
+      echo "And this is also true"
  } else {
-      echo "Já por aqui, só verdades..."
+      echo "Over here, only truths..."
 }
 
 if (x| (= 6 6) (= 3 6) ) {
-      echo "Ou uma coisa ou outra!"
+      echo "Either one thing or another!"
  } (x| (= 6 6) (= 3 3) ) {
-      echo "As duas, nem pensar!"
+      echo "Both, no way!"
  } (x| (= 6 3) (= 3 6) ) {
-      echo "Nenhuma, muito menos!"
+      echo "Neither, not even close!"
  }

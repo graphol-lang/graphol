@@ -45,53 +45,53 @@ echo (8 * 2 / 4)
 #[test]
 fn executes_blocks_with_inbox() {
     let source = r#"
-dobra {
+double {
    x inbox
-   echo "o dobro e:" (x * 2)
+   echo "the double is:" (x * 2)
 }
 
-numero 5
-dobra numero run
+number 5
+double number run
 "#;
 
-    assert_eq!(values(source, vec![]), vec!["o dobro e:", "10"]);
+    assert_eq!(values(source, vec![]), vec!["the double is:", "10"]);
 }
 
 #[test]
 fn executes_conditionals_and_else() {
     let source = r#"
 if (= 3 6){
-      echo "Isto e falso"
+      echo "This is false"
  } (> 4 5) {
-      echo "Isto nao e verdade"
+      echo "This is not true"
  } else {
-      echo "Na verdade, sem verdades por aqui..."
+      echo "Actually, no truths around here..."
 }
 
 if (!(= 3 6)){
-      echo "Em programacao, a negacao de uma mentira e uma verdade!"
+      echo "In programming, the negation of a lie is truth!"
  } (< 4 5) {
-      echo "E isto tambem e verdade"
+      echo "And this is also true"
  } else {
-      echo "Ja por aqui, so verdades..."
+      echo "Over here, only truths..."
 }
 
 if (x| (= 6 6) (= 3 6) ) {
-      echo "Ou uma coisa ou outra!"
+      echo "Either one thing or another!"
  } (x| (= 6 6) (= 3 3) ) {
-      echo "As duas, nem pensar!"
+      echo "Both, no way!"
  } (x| (= 6 3) (= 3 6) ) {
-      echo "Nenhuma, muito menos!"
+      echo "Neither, not even close!"
  }
 "#;
 
     assert_eq!(
         values(source, vec![]),
         vec![
-            "Na verdade, sem verdades por aqui...",
-            "Em programacao, a negacao de uma mentira e uma verdade!",
-            "E isto tambem e verdade",
-            "Ou uma coisa ou outra!"
+            "Actually, no truths around here...",
+            "In programming, the negation of a lie is truth!",
+            "And this is also true",
+            "Either one thing or another!"
         ]
     );
 }
@@ -148,14 +148,14 @@ baz run
 #[test]
 fn composes_input_prompt_and_reads_once_per_expression() {
     let source = r#"
-dobra {
+double {
    x inbox
-   echo "o dobro e:" (x * 2)
+   echo "the double is:" (x * 2)
 }
 
-nome (input "Qual o seu nome?")
-numero 0 (input "Ola " nome ", diga um numero.")
-dobra numero run
+name (input "What is your name?")
+number 0 (input "Hello " name ", tell me a number.")
+double number run
 "#;
 
     let capture = Rc::new(RefCell::new(InputCapture::default()));
@@ -167,12 +167,12 @@ dobra numero run
     let events = run_graphol(source, Box::new(io)).expect("program should run");
     let out: Vec<String> = events.into_iter().map(|event| event.value).collect();
 
-    assert_eq!(out, vec!["o dobro e:", "24"]);
+    assert_eq!(out, vec!["the double is:", "24"]);
     assert_eq!(
         capture.borrow().prompts.clone(),
         vec![
-            "Qual o seu nome?".to_string(),
-            "Ola Chavao, diga um numero.".to_string()
+            "What is your name?".to_string(),
+            "Hello Chavao, tell me a number.".to_string()
         ]
     );
 }
