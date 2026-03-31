@@ -2,6 +2,7 @@ use std::env;
 use std::io::{self, Read};
 
 mod cli;
+mod runtime_artifacts;
 
 use cli::{compile_file, parse_cli_args};
 use graphol::runtime::StdIo;

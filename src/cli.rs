@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use crate::runtime_artifacts::find_runtime_artifacts;
 use graphol::parser::parse_program;
 use graphol::source_loader::load_entry_source;
 
@@ -68,71 +69,33 @@ pub fn compile_file(input: &Path, output: &Path) -> Result<(), Box<dyn std::erro
     let (rlib_path, deps_path) = find_runtime_artifacts()?;
     let runner_source = build_runner_source(&source);
     let runner_path = write_runner_source(&runner_source)?;
-    let compile_result = compile_runner(&runner_path, output, &rlib_path, &deps_path);
+    let compile_result = compile_runner(&runner_path, output, &rlib_path, deps_path.as_deref());
     let _ = fs::remove_file(&runner_path);
     compile_result?;
 
     Ok(())
 }
 
-fn find_runtime_artifacts() -> io::Result<(PathBuf, PathBuf)> {
-    let exe = env::current_exe()?;
-    let exe_dir = exe.parent().ok_or_else(|| {
-        io::Error::new(
-            io::ErrorKind::NotFound,
-            "failed to resolve executable directory",
-        )
-    })?;
-    let deps_path = exe_dir.join("deps");
-    if !deps_path.exists() {
-        return Err(io::Error::new(
-            io::ErrorKind::NotFound,
-            "missing runtime artifacts in target dir; run `cargo build` first",
-        ));
-    }
-
-    let plain_rlib = exe_dir.join("libgraphol.rlib");
-    if plain_rlib.exists() {
-        return Ok((plain_rlib, deps_path));
-    }
-
-    let mut hashed_rlibs = Vec::new();
-    for entry in fs::read_dir(&deps_path)? {
-        let entry = entry?;
-        let path = entry.path();
-        if let Some(name) = path.file_name().and_then(|file| file.to_str()) {
-            if name.starts_with("libgraphol-") && name.ends_with(".rlib") {
-                hashed_rlibs.push(path);
-            }
-        }
-    }
-    hashed_rlibs.sort_unstable();
-
-    let rlib_path = hashed_rlibs.into_iter().next().ok_or_else(|| {
-        io::Error::new(
-            io::ErrorKind::NotFound,
-            "could not find graphol runtime library; run `cargo build` first",
-        )
-    })?;
-    Ok((rlib_path, deps_path))
-}
-
 fn compile_runner(
     runner_path: &Path,
     output: &Path,
     rlib_path: &Path,
-    deps_path: &Path,
+    deps_path: Option<&Path>,
 ) -> io::Result<()> {
-    let output = Command::new("rustc")
+    let mut command = Command::new("rustc");
+    command
         .arg("--edition=2024")
         .arg(runner_path)
         .arg("-o")
         .arg(output)
         .arg("--extern")
-        .arg(format!("graphol={}", rlib_path.display()))
-        .arg("-L")
-        .arg(format!("dependency={}", deps_path.display()))
-        .output()?;
+        .arg(format!("graphol={}", rlib_path.display()));
+    if let Some(deps_path) = deps_path {
+        command
+            .arg("-L")
+            .arg(format!("dependency={}", deps_path.display()));
+    }
+    let output = command.output()?;
 
     if output.status.success() {
         Ok(())
