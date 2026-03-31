@@ -3,6 +3,8 @@ use std::fmt::{Display, Formatter};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+const DEFAULT_ENTRY_FILE: &str = "main.graphol";
+
 #[derive(Debug, Clone)]
 pub struct IncludeError {
     pub message: String,
@@ -26,7 +28,8 @@ impl std::error::Error for IncludeError {}
 
 pub fn load_entry_source(path: &Path) -> Result<String, IncludeError> {
     let mut resolver = IncludeResolver::new();
-    resolver.load_file(path)
+    let entry_path = resolve_entry_path(path);
+    resolver.load_file(&entry_path)
 }
 
 pub fn resolve_source(source: &str, base_dir: Option<&Path>) -> Result<String, IncludeError> {
@@ -272,4 +275,11 @@ fn contains_include_keyword(line: &str) -> bool {
 
 fn is_name_terminator(c: char) -> bool {
     matches!(c, '+' | '-' | '*' | '/' | '^' | ')' | '(' | '{' | '}')
+}
+
+fn resolve_entry_path(path: &Path) -> PathBuf {
+    if path.is_dir() {
+        return path.join(DEFAULT_ENTRY_FILE);
+    }
+    path.to_path_buf()
 }

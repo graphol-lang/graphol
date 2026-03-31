@@ -40,6 +40,15 @@ fn includes_same_file_only_once() {
 }
 
 #[test]
+fn loads_main_graphol_when_entry_path_is_directory() {
+    let root = create_temp_dir("dir_entry_defaults_to_main");
+    fs::write(root.join("main.graphol"), "echo \"main\"\n").expect("main should be written");
+
+    let resolved = load_entry_source(&root).expect("directory entry should load main.graphol");
+    assert_eq!(resolved, "echo \"main\"\n");
+}
+
+#[test]
 fn fails_on_include_cycle() {
     let root = create_temp_dir("include_cycle");
     fs::write(root.join("a.graphol"), "include \"b.graphol\"\n").expect("a should be written");

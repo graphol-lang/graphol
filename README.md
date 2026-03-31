@@ -54,6 +54,22 @@ Run the generated executable:
 ./program5
 ```
 
+### 4. Use a directory as input (defaults to `main.graphol`)
+
+If the input path is a directory, `graphol-rs` automatically uses `<directory>/main.graphol` as the entry file.
+
+Run in interpreter mode:
+
+```bash
+./target/debug/graphol-rs examples
+```
+
+Compile from directory entry:
+
+```bash
+./target/debug/graphol-rs examples -o program_from_examples
+```
+
 ### Difference between using `-o/--output` or not
 
 - Without `-o/--output`: runs as an interpreter immediately and does not create a new executable file.
