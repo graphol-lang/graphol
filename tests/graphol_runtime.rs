@@ -1,35 +1,59 @@
-use graphol::runtime::{OutputMode, RuntimeIo, TestIo};
-use graphol::{run_graphol, run_graphol_file};
-use std::cell::RefCell;
-use std::collections::VecDeque;
+use graphol::compile_entry_to_binary;
 use std::fs;
+use std::io::Write;
 use std::path::PathBuf;
-use std::rc::Rc;
+use std::process::{Command, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-fn values(source: &str, inputs: Vec<&str>) -> Vec<String> {
-    let io = TestIo::new(inputs.into_iter().map(ToString::to_string).collect());
-    let events = run_graphol(source, Box::new(io)).expect("program should run");
-    events.into_iter().map(|event| event.value).collect()
-}
+fn compile_and_run(main_source: &str, extra_files: &[(&str, &str)], inputs: &[&str]) -> String {
+    let root = create_temp_dir("native_runtime");
+    fs::write(root.join("main.graphol"), main_source).expect("main.graphol should be written");
 
-#[derive(Default)]
-struct InputCapture {
-    prompts: Vec<String>,
-}
-
-struct CapturingIo {
-    inputs: VecDeque<String>,
-    capture: Rc<RefCell<InputCapture>>,
-}
-
-impl RuntimeIo for CapturingIo {
-    fn read_input(&mut self, prompt: &str) -> String {
-        self.capture.borrow_mut().prompts.push(prompt.to_string());
-        self.inputs.pop_front().unwrap_or_default()
+    for (relative_path, content) in extra_files {
+        fs::write(root.join(relative_path), content).expect("extra source should be written");
     }
 
-    fn on_output(&mut self, _mode: OutputMode, _value: &str) {}
+    let output_path = root.join("program");
+    compile_entry_to_binary(&root.join("main.graphol"), &output_path)
+        .expect("native compilation should succeed");
+
+    let mut child = Command::new(&output_path)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("compiled program should spawn");
+
+    if !inputs.is_empty() {
+        let payload = format!("{}\n", inputs.join("\n"));
+        child
+            .stdin
+            .as_mut()
+            .expect("stdin should be available")
+            .write_all(payload.as_bytes())
+            .expect("stdin payload should be written");
+    }
+
+    let output = child
+        .wait_with_output()
+        .expect("program execution should finish");
+
+    assert!(
+        output.status.success(),
+        "compiled program failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    String::from_utf8_lossy(&output.stdout).to_string()
+}
+
+fn output_lines(stdout: &str) -> Vec<String> {
+    stdout
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(ToString::to_string)
+        .collect()
 }
 
 #[test]
@@ -42,7 +66,8 @@ echo (8 + 3 4 - 1 2)
 echo (8 * 2 / 4)
 "#;
 
-    assert_eq!(values(source, vec![]), vec!["4", "6", "9", "12", "4"]);
+    let stdout = compile_and_run(source, &[], &[]);
+    assert_eq!(output_lines(&stdout), vec!["4", "6", "9", "12", "4"]);
 }
 
 #[test]
@@ -57,7 +82,8 @@ number 5
 double number run
 "#;
 
-    assert_eq!(values(source, vec![]), vec!["the double is:", "10"]);
+    let stdout = compile_and_run(source, &[], &[]);
+    assert_eq!(output_lines(&stdout), vec!["the double is:", "10"]);
 }
 
 #[test]
@@ -88,8 +114,9 @@ if (x| (= 6 6) (= 3 6) ) {
  }
 "#;
 
+    let stdout = compile_and_run(source, &[], &[]);
     assert_eq!(
-        values(source, vec![]),
+        output_lines(&stdout),
         vec![
             "Actually, no truths around here...",
             "In programming, the negation of a lie is truth!",
@@ -141,11 +168,12 @@ bar async run
 baz run
 "#;
 
-    let out = values(source, vec![]);
-    assert_eq!(out.len(), 24);
-    assert!(out.contains(&"FOOOOOOOOO".to_string()));
-    assert!(out.contains(&"BARRRRRRRR".to_string()));
-    assert!(out.contains(&"BAZZZZZZZZ".to_string()));
+    let stdout = compile_and_run(source, &[], &[]);
+    let lines = output_lines(&stdout);
+    assert_eq!(lines.len(), 24);
+    assert!(lines.contains(&"FOOOOOOOOO".to_string()));
+    assert!(lines.contains(&"BARRRRRRRR".to_string()));
+    assert!(lines.contains(&"BAZZZZZZZZ".to_string()));
 }
 
 #[test]
@@ -161,45 +189,28 @@ number 0 (input "Hello " name ", tell me a number.")
 double number run
 "#;
 
-    let capture = Rc::new(RefCell::new(InputCapture::default()));
-    let io = CapturingIo {
-        inputs: vec!["Chavao".to_string(), "12".to_string()].into(),
-        capture: capture.clone(),
-    };
-
-    let events = run_graphol(source, Box::new(io)).expect("program should run");
-    let out: Vec<String> = events.into_iter().map(|event| event.value).collect();
-
-    assert_eq!(out, vec!["the double is:", "24"]);
-    assert_eq!(
-        capture.borrow().prompts.clone(),
-        vec![
-            "What is your name?".to_string(),
-            "Hello Chavao, tell me a number.".to_string()
-        ]
-    );
+    let stdout = compile_and_run(source, &[], &["Chavao", "12"]);
+    assert!(stdout.contains("What is your name?"));
+    assert!(stdout.contains("Hello Chavao, tell me a number."));
+    assert!(stdout.contains("the double is:"));
+    assert!(stdout.contains("24"));
 }
 
 #[test]
 fn executes_program_with_include_from_file() {
-    let root = create_temp_dir("runtime_include");
-    fs::write(
-        root.join("main.graphol"),
-        "include \"program3.graphol\"\n\ndouble 44 run\n",
-    )
-    .expect("main should be written");
-    fs::write(
-        root.join("program3.graphol"),
-        "double {\n   x inbox\n   echo \"the double is:\" (x * 2)\n}\n\nname (input \"What is your name?\")\nnumber 0 (input \"Hello \" name \", tell me a number.\")\ndouble number run\n",
-    )
-    .expect("program3 should be written");
+    let main = "include \"program3.graphol\"\n\ndouble 44 run\n";
+    let program3 = "double {\n   x inbox\n   echo \"the double is:\" (x * 2)\n}\n\nname (input \"What is your name?\")\nnumber 0 (input \"Hello \" name \", tell me a number.\")\ndouble number run\n";
 
-    let io = TestIo::new(vec!["Ada".to_string(), "44".to_string()]);
-    let events = run_graphol_file(&root.join("main.graphol"), Box::new(io))
-        .expect("program with include should run");
-    let out: Vec<String> = events.into_iter().map(|event| event.value).collect();
-
-    assert_eq!(out, vec!["the double is:", "88", "the double is:", "88"]);
+    let stdout = compile_and_run(main, &[("program3.graphol", program3)], &["Ada", "44"]);
+    assert_eq!(
+        output_lines(&stdout),
+        vec![
+            "What is your name? Hello Ada, tell me a number. the double is:",
+            "88",
+            "the double is:",
+            "88"
+        ]
+    );
 }
 
 fn create_temp_dir(name: &str) -> PathBuf {
@@ -207,7 +218,7 @@ fn create_temp_dir(name: &str) -> PathBuf {
         .duration_since(UNIX_EPOCH)
         .expect("time should be monotonic")
         .as_nanos();
-    let path = std::env::temp_dir().join(format!("graphol_runtime_test_{}_{}", name, timestamp));
+    let path = std::env::temp_dir().join(format!("graphol_native_test_{}_{}", name, timestamp));
     fs::create_dir_all(&path).expect("temp dir should be created");
     path
 }
