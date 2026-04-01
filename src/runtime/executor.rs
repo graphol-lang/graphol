@@ -152,9 +152,12 @@ impl RuntimeEngine {
 
         let receiver = self.eval_root(&expr.nodes[0], scope)?;
         let message_nodes = &expr.nodes[1..];
+        let is_while_receiver = receiver.borrow().get_type() == "whileCommand";
         let is_input_receiver = receiver.borrow().get_type() == "input";
 
-        if is_input_receiver {
+        if is_while_receiver {
+            self.eval_while(&receiver, message_nodes, scope)?;
+        } else if is_input_receiver {
             if !message_nodes.is_empty() {
                 let mut prompt = String::new();
                 for node in message_nodes {
@@ -172,6 +175,35 @@ impl RuntimeEngine {
 
         end_object(&receiver);
         Ok(receiver)
+    }
+
+    fn eval_while(
+        &mut self,
+        receiver: &ObjectRef,
+        message_nodes: &[NodeExpr],
+        scope: &ScopeRef,
+    ) -> Result<(), RuntimeError> {
+        if message_nodes.len() < 2 {
+            return Ok(());
+        }
+
+        let condition = &message_nodes[0];
+        let body = &message_nodes[1];
+
+        loop {
+            let evaluated_condition = self.eval_message(condition, scope)?;
+            let should_continue = evaluated_condition.as_bool();
+            receive_object(receiver, evaluated_condition, self);
+
+            if !should_continue {
+                break;
+            }
+
+            let evaluated_body = self.eval_message(body, scope)?;
+            receive_object(receiver, evaluated_body, self);
+        }
+
+        Ok(())
     }
 
     fn eval_root(&mut self, node: &NodeExpr, scope: &ScopeRef) -> Result<ObjectRef, RuntimeError> {
