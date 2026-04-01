@@ -1,8 +1,8 @@
 # Graphol — Towards a New Language
 
-Graphol is a Graph Oriented Language, with the compiler/interpreter written in Rust.
+Graphol is a Graph Oriented Language, with the compiler written in Rust.
 
-## Build and Run (Interpreter vs Compiled Binary)
+## Build and Run
 
 Use this section as a quick reference for day-to-day usage.
 
@@ -44,22 +44,11 @@ Run the generated executable:
 
 If the input path is a directory, `graphol` automatically uses `<directory>/main.graphol` as the entry file.
 
-Run in interpreter mode:
-
-```bash
-graphol examples
-```
-
 Compile from directory entry:
 
 ```bash
 graphol examples -o program_from_examples
 ```
-
-### Difference between using `-o/--output` or not
-
-- Without `-o/--output`: runs as an interpreter immediately and does not create a new executable file.
-- With `-o/--output`: compiles the `.graphol` source into a native Linux executable at the specified output path, which you run directly later.
 
 # Graphol Rust Codebase Summary
 
