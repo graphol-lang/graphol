@@ -15,7 +15,7 @@ const NUMERIC_OPS_SOURCE: &str = include_str!("../runtime/object/object_strategi
 const STRATEGY_PREDICATES_SOURCE: &str =
     include_str!("../runtime/object/object_strategies/strategy_predicates.rs");
 const SCOPE_SOURCE: &str = include_str!("../runtime/scope.rs");
-const VM_SOURCE: &str = include_str!("../runtime/vm.rs");
+const EXECUTOR_SOURCE: &str = include_str!("../runtime/executor.rs");
 
 pub fn generate_rust_source(program: &ProgramIr) -> String {
     let mut out = String::new();
@@ -38,7 +38,9 @@ pub fn generate_rust_source(program: &ProgramIr) -> String {
 
     out.push_str("fn main() {\n");
     out.push_str("    let program = build_program();\n");
-    out.push_str("    let mut vm = runtime::Vm::new(program, Box::new(runtime::StdIo));\n");
+    out.push_str(
+        "    let mut vm = runtime::RuntimeEngine::new(program, Box::new(runtime::StdIo));\n",
+    );
     out.push_str("    if let Err(err) = vm.run() {\n");
     out.push_str("        eprintln!(\"error: {}\", err);\n");
     out.push_str("        std::process::exit(1);\n");
@@ -87,10 +89,10 @@ fn runtime_module_source() -> String {
     out.push_str("    }\n");
 
     push_nested_module(&mut out, "scope", SCOPE_SOURCE, 1);
-    push_nested_module(&mut out, "vm", VM_SOURCE, 1);
+    push_nested_module(&mut out, "executor", EXECUTOR_SOURCE, 1);
 
     out.push_str("    pub use io::{OutputEvent, OutputMode, RuntimeIo, StdIo, TestIo};\n");
-    out.push_str("    pub use vm::{Vm, VmError};\n");
+    out.push_str("    pub use executor::{RuntimeEngine, RuntimeError};\n");
     out.push_str("}\n");
 
     out
