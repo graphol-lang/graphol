@@ -1,0 +1,24 @@
+echo "First loop"
+
+i 0
+
+while (< i 10) {
+    echo i
+    i 1
+
+    if (> i 5) {
+        break
+    }
+}
+
+echo "Next loop"
+
+x 0
+
+while (< x 10) {
+    x 1
+    if (<= x 5) {
+        continue
+    }
+    echo ("After 5 keep going " x)
+}
