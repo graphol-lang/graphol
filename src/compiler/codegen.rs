@@ -1,6 +1,6 @@
 use std::fmt::Write;
 
-use crate::ast::{ArithmeticOp, BooleanOp, LogicOp, ReservedToken};
+use crate::ast::{ArithmeticOp, BooleanOp, ControlOp, LogicOp, ReservedToken};
 use crate::ir::{BlockIr, ExprIr, NodeIr, ProgramIr};
 
 const AST_SOURCE: &str = include_str!("../ast.rs");
@@ -190,6 +190,9 @@ fn render_reserved_token(token: ReservedToken) -> String {
         ReservedToken::Boolean(op) => {
             format!("ast::ReservedToken::Boolean({})", render_boolean_op(op))
         }
+        ReservedToken::Control(op) => {
+            format!("ast::ReservedToken::Control({})", render_control_op(op))
+        }
     }
 }
 
@@ -220,6 +223,13 @@ fn render_boolean_op(op: BooleanOp) -> &'static str {
         BooleanOp::Or => "ast::BooleanOp::Or",
         BooleanOp::Not => "ast::BooleanOp::Not",
         BooleanOp::Xor => "ast::BooleanOp::Xor",
+    }
+}
+
+fn render_control_op(op: ControlOp) -> &'static str {
+    match op {
+        ControlOp::Break => "ast::ControlOp::Break",
+        ControlOp::Continue => "ast::ControlOp::Continue",
     }
 }
 

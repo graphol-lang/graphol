@@ -30,6 +30,7 @@ pub enum ReservedToken {
     Arithmetic(ArithmeticOp),
     Logic(LogicOp),
     Boolean(BooleanOp),
+    Control(ControlOp),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -57,4 +58,19 @@ pub enum BooleanOp {
     Or,
     Not,
     Xor,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ControlOp {
+    Break,
+    Continue,
+}
+
+impl ControlOp {
+    pub fn keyword(&self) -> &'static str {
+        match self {
+            Self::Break => "break",
+            Self::Continue => "continue",
+        }
+    }
 }
