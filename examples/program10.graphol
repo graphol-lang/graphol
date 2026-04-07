@@ -1,0 +1,19 @@
+// Composition examples: pass list to blocks and mutate nested lists.
+
+show_list {
+    data inbox
+    echo ("received -> " data)
+    echo ("first item -> " (list_get data 0))
+    echo ("len -> " (list_len data))
+}
+
+payload (list "graph" "oriented" "language")
+show_list payload run
+
+mixed (list 1 "two" true (list 3 4))
+echo ("mixed -> " mixed)
+echo ("nested before push -> " (list_get mixed 3))
+
+list_push (list_get mixed 3) 5
+echo ("nested after push -> " (list_get mixed 3))
+echo ("mixed after nested push -> " mixed)

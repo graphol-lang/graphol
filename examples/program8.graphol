@@ -1,0 +1,18 @@
+// List basics: create, push, get, set, pop, len.
+
+nums (list 1 2 3)
+echo ("initial -> " nums)
+
+list_push nums 4
+echo ("after push -> " nums)
+echo ("len -> " (list_len nums))
+
+echo ("index 0 -> " (list_get nums 0))
+echo ("index 2 -> " (list_get nums 2))
+
+list_set nums 1 99
+echo ("after set index 1 -> " nums)
+
+last (list_pop nums)
+echo ("popped -> " last)
+echo ("after pop -> " nums)

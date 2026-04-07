@@ -9,6 +9,8 @@ const IO_SOURCE: &str = include_str!("../runtime/io.rs");
 const VALUE_SOURCE: &str = include_str!("../runtime/value.rs");
 const OBJECT_SOURCE: &str = include_str!("../runtime/object.rs");
 const OBJECT_COMMANDS_SOURCE: &str = include_str!("../runtime/object/object_commands.rs");
+const LIST_OBJECT_SOURCE: &str = include_str!("../runtime/object/list_object.rs");
+const LIST_COMMANDS_SOURCE: &str = include_str!("../runtime/object/list_commands.rs");
 const NODE_PRIMITIVES_SOURCE: &str =
     include_str!("../runtime/object/object_strategies/node_primitives.rs");
 const NUMERIC_OPS_SOURCE: &str = include_str!("../runtime/object/object_strategies/numeric_ops.rs");
@@ -60,6 +62,8 @@ fn runtime_module_source() -> String {
 
     out.push_str("    pub mod object {\n");
     push_nested_module(&mut out, "object_commands", OBJECT_COMMANDS_SOURCE, 2);
+    push_nested_module(&mut out, "list_object", LIST_OBJECT_SOURCE, 2);
+    push_nested_module(&mut out, "list_commands", LIST_COMMANDS_SOURCE, 2);
 
     out.push_str("        mod object_strategies {\n");
     out.push_str("            mod strategy_core {\n");
@@ -120,7 +124,10 @@ fn strip_object_module_decls(source: &str) -> String {
         .lines()
         .filter(|line| {
             let trimmed = line.trim();
-            trimmed != "mod object_commands;" && trimmed != "mod object_strategies;"
+            trimmed != "mod object_commands;"
+                && trimmed != "mod list_object;"
+                && trimmed != "mod list_commands;"
+                && trimmed != "mod object_strategies;"
         })
         .collect::<Vec<_>>()
         .join("\n")

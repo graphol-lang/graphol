@@ -3,8 +3,9 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use super::object::{
-    StdoutState, new_echo, new_if, new_input, new_message_async, new_message_else, new_message_run,
-    new_node, new_stdout, new_while,
+    StdoutState, new_echo, new_if, new_input, new_list_get, new_list_len, new_list_pop,
+    new_list_push, new_list_set, new_message_async, new_message_else, new_message_run, new_node,
+    new_stdout, new_while,
 };
 use super::value::ObjectRef;
 
@@ -26,6 +27,11 @@ impl Scope {
         values.insert("if".to_string(), new_if());
         values.insert("else".to_string(), new_message_else());
         values.insert("while".to_string(), new_while());
+        values.insert("list_push".to_string(), new_list_push());
+        values.insert("list_pop".to_string(), new_list_pop());
+        values.insert("list_get".to_string(), new_list_get());
+        values.insert("list_set".to_string(), new_list_set());
+        values.insert("list_len".to_string(), new_list_len());
 
         Rc::new(RefCell::new(Self { values, parent }))
     }
