@@ -283,6 +283,51 @@ fn executes_program_with_include_from_file() {
     );
 }
 
+#[test]
+fn executes_list_operations() {
+    let source = r#"
+nums (list 1 2 3)
+list_push nums 4
+echo nums
+echo (list_len nums)
+echo (list_get nums 0)
+list_set nums 1 99
+echo nums
+echo (list_pop nums)
+echo nums
+list_set nums 9 123
+echo (list_len nums)
+"#;
+
+    let stdout = compile_and_run(source, &[], &[]);
+    assert_eq!(
+        output_lines(&stdout),
+        vec![
+            "[1, 2, 3, 4]",
+            "4",
+            "1",
+            "[1, 99, 3, 4]",
+            "4",
+            "[1, 99, 3]",
+            "3",
+        ]
+    );
+}
+
+#[test]
+fn list_pop_on_empty_is_falsy() {
+    let source = r#"
+if (list_pop (list)) {
+    echo "unexpected"
+} else {
+    echo "empty"
+}
+"#;
+
+    let stdout = compile_and_run(source, &[], &[]);
+    assert_eq!(output_lines(&stdout), vec!["empty"]);
+}
+
 fn create_temp_dir(name: &str) -> PathBuf {
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
