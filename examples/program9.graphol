@@ -1,0 +1,18 @@
+// Safe edge cases: empty pop, out-of-range get/set.
+
+empty (list)
+echo ("empty len -> " (list_len empty))
+
+if (list_pop empty) {
+    echo "unexpected"
+} else {
+    echo "pop on empty returns null (falsy)"
+}
+
+nums (list 10 20)
+echo ("before invalid operations -> " nums)
+
+echo ("out-of-range get (index 9) -> " (list_get nums 9))
+list_set nums 9 777
+
+echo ("after invalid set (should be unchanged) -> " nums)
