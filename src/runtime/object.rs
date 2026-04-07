@@ -1,4 +1,6 @@
 mod object_commands;
+mod list_commands;
+mod list_object;
 mod object_strategies;
 
 use std::any::Any;
@@ -16,6 +18,8 @@ pub use object_commands::{
     new_block, new_echo, new_if, new_input, new_message_async, new_message_else, new_message_run,
     new_stdout, new_while,
 };
+pub use list_commands::{new_list_get, new_list_len, new_list_pop, new_list_push, new_list_set};
+pub use list_object::new_list;
 pub use object_strategies::{
     new_boolean_operator, new_logic_operator, new_node, new_number, new_operator, new_string,
 };
@@ -69,6 +73,26 @@ pub trait GrapholObject {
 
     fn block_snapshot(&self) -> Option<BlockSnapshot> {
         None
+    }
+
+    fn list_len(&self) -> Option<usize> {
+        None
+    }
+
+    fn list_get(&self, _index: usize) -> Option<Value> {
+        None
+    }
+
+    fn list_set(&mut self, _index: usize, _value: Value) -> bool {
+        false
+    }
+
+    fn list_pop(&mut self) -> Option<Value> {
+        None
+    }
+
+    fn list_push(&mut self, _value: Value) -> bool {
+        false
     }
 
     fn as_any(&self) -> &dyn Any;
