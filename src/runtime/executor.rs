@@ -6,7 +6,7 @@ use super::host::ExecutionHost;
 use super::io::{OutputEvent, OutputMode, RuntimeIo};
 use super::object::{
     BlockSnapshot, StdoutState, end_object, new_block, new_boolean_operator, new_logic_operator,
-    new_node, new_operator, receive_object,
+    new_list, new_node, new_operator, receive_object,
 };
 use super::scope::{Scope, ScopeRef};
 use super::value::{ObjectRef, Value};
@@ -265,6 +265,10 @@ impl RuntimeEngine {
     fn eval_root(&mut self, node: &NodeExpr, scope: &ScopeRef) -> Result<ObjectRef, RuntimeError> {
         match node {
             NodeExpr::Identifier(name) => {
+                if name == "list" {
+                    return Ok(new_list());
+                }
+
                 if let Some(literal) = parse_literal(name) {
                     let node_ref = new_node();
                     receive_object(&node_ref, literal, self);
@@ -292,7 +296,11 @@ impl RuntimeEngine {
     fn eval_message(&mut self, node: &NodeExpr, scope: &ScopeRef) -> Result<Value, RuntimeError> {
         let value = match node {
             NodeExpr::Identifier(name) => {
-                parse_literal(name).unwrap_or_else(|| Value::Obj(Scope::get(scope, name)))
+                if name == "list" {
+                    Value::Obj(new_list())
+                } else {
+                    parse_literal(name).unwrap_or_else(|| Value::Obj(Scope::get(scope, name)))
+                }
             }
             NodeExpr::StringLiteral(text) => Value::Text(text.clone()),
             NodeExpr::Reserved(token) => Value::Obj(reserved_to_object(*token)?),

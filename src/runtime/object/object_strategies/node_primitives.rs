@@ -83,6 +83,38 @@ impl GrapholObject for NodeObject {
             .unwrap_or(ScalarValue::Null)
     }
 
+    fn list_len(&self) -> Option<usize> {
+        self.strategy
+            .as_ref()
+            .and_then(|strategy| strategy.borrow().list_len())
+    }
+
+    fn list_get(&self, index: usize) -> Option<Value> {
+        self.strategy
+            .as_ref()
+            .and_then(|strategy| strategy.borrow().list_get(index))
+    }
+
+    fn list_set(&mut self, index: usize, value: Value) -> bool {
+        self.strategy
+            .as_ref()
+            .map(|strategy| strategy.borrow_mut().list_set(index, value))
+            .unwrap_or(false)
+    }
+
+    fn list_pop(&mut self) -> Option<Value> {
+        self.strategy
+            .as_ref()
+            .and_then(|strategy| strategy.borrow_mut().list_pop())
+    }
+
+    fn list_push(&mut self, value: Value) -> bool {
+        self.strategy
+            .as_ref()
+            .map(|strategy| strategy.borrow_mut().list_push(value))
+            .unwrap_or(false)
+    }
+
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -150,6 +182,7 @@ fn strategy_factory(value: Value, host: &mut dyn ExecutionHost) -> ObjectRef {
             let kind = obj.borrow().get_type().to_string();
             match kind.as_str() {
                 "block" => obj,
+                "list" => obj,
                 "boolean" => object_ref(BooleanStrategy {
                     value: obj.borrow().toboolean(),
                 }),
