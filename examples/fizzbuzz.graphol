@@ -1,0 +1,29 @@
+i 1
+
+while (<= i 15) {
+    rem3 * 0 + i
+    while (>= rem3 3) {
+        rem3 - 3
+    }
+
+    rem5 * 0 + i
+    while (>= rem5 5) {
+        rem5 - 5
+    }
+
+    if (= rem3 0) {
+        if (= rem5 0) {
+            echo "FizzBuzz"
+        } else {
+            echo "Fizz"
+        }
+    } else {
+        if (= rem5 0) {
+            echo "Buzz"
+        } else {
+            echo i
+        }
+    }
+
+    i + 1
+}
